@@ -1,0 +1,9 @@
+
+*.lock
+*.bin
+*.properties
+lab1/gradle/wrapper/gradle-wrapper.jar
+lab1/.idea/misc.xml
+lab1/gradlew
+*.xml
+*.bat
