@@ -1,12 +1,12 @@
 package com.nsu.jul.http;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 //TODO
 //Необходимые возможности:
 //- Поддержка только GET запроса: возвращение файла, лежащего по данному адресу на машине, где запущен сервер
@@ -21,47 +21,86 @@ import java.nio.charset.StandardCharsets;
 //- Обработка ошибок: 405 Method Not Allowed на неподдерживаемый метод, 404 Not Found если файла нет
 
 public class HttpServer {
-
-    public static void runServer() {
-        try (ServerSocket serverSocket = new ServerSocket(8080)) {
-            System.out.println("Server started!");
-
-            while (true) {
-                // ожидаем подключения
-                Socket socket = serverSocket.accept();
-                System.out.println("Client connected!");
-
-                // для подключившегося клиента открываем потоки 
-                // чтения и записи
-                //get for text
-                //TODO get for jpeg MIME типы: text/plain, text/html, image/jpeg
-                try (BufferedReader input = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                     PrintWriter output = new PrintWriter(socket.getOutputStream())) {
-
-                    // ждем первой строки запроса
-                    while (!input.ready()) ;
-
-                    // считываем и печатаем все что было отправлено клиентом
-                    System.out.println();
-                    while (input.ready()) {
-                        System.out.println(input.readLine());
+    //define const
+    static final int PORT = 8000;
+    //run server
+    public static void runServer() throws IOException {
+        try(ServerSocket serverSocket = new ServerSocket(PORT)) {
+            while(true) {
+                System.out.println("Server started!");
+                try (Socket client  = serverSocket.accept()) {
+                    Request request = handleRequest(client);
+                    if (request == null) {
+                        System.out.println("Empty package");
+                        continue;
                     }
-                    //
-                    //Примечание: картинки можно передавать просто как набор байт в сокет.
-                    // отправляем ответ
-                    output.println("HTTP/1.1 200 OK");
-                    output.println("Content-Type: text/html; charset=utf-8");
-                    output.println();
-                    output.println("<p>Привет всем!</p>");
-                    output.flush();
-
-                    // по окончанию выполнения блока try-with-resources потоки, 
-                    // а вместе с ними и соединение будут закрыты
-                    System.out.println("Client disconnected!");
+                    if (request.getMethod().equals("GET")) {
+                        String path = request.getPath();
+                        Path filePath = getFilePath(path);
+                        if (Files.exists(filePath)) {
+                            // file exist
+                            String contentType = getType(filePath);
+                            //sendResponse(client, "200 OK", contentType, Files.readAllBytes(filePath), request);
+                        } else {
+                            byte[] error = "<h1>404 Not found </h1>".getBytes(StandardCharsets.UTF_8);
+                           // sendResponse(client, "404 Not found", "text/html", error, request);
+                        }
+                    } else {
+                        byte[] error = "<h1>405 Method Not Allowed </h1>".getBytes(StandardCharsets.UTF_8);
+                       // sendResponse();
+                    }
                 }
             }
-        } catch (IOException ex) {
-            ex.printStackTrace();
+        }
+    }
+    //handle request from client
+    public static Request handleRequest(Socket client) throws IOException {
+        BufferedReader input = new BufferedReader(new InputStreamReader(client.getInputStream()));
+        StringBuilder requestBuilder = new StringBuilder();
+        String line;
+        Request request = null;
+        while ((line = input.readLine()) != null) {
+            if (line.isEmpty()) break;
+            requestBuilder.append(line).append("\r\n");
+        }
+        if (requestBuilder.length() == 0) {
+            client.close();
+        } else {
+            request = new Request(requestBuilder);
+            request.print();
+        }
+        return request;
+    }
+
+//get type for content
+    public static String getType(Path filePath) throws IOException {
+        return Files.probeContentType(filePath);
+    }
+//get path of content file
+    private static Path getFilePath(String path) {
+        if ("/".equals(path)) {
+            path = "/index.html";
+        }
+        if ("/text.txt".equals(path)) {
+            path = "/text.txt";
+        }
+        if ("/image.jpg".equals(path)) {
+            path = "/image.jpg";
+        }
+        return Paths.get("src", path);
+    }
+//send response to client
+    public static void sendResponse(Socket client, String status, String contentType, byte[] content, Request request) throws IOException {
+        OutputStream clientOutput = client.getOutputStream();
+        clientOutput.write(("HTTP/1.1 \r\n" + status).getBytes(StandardCharsets.UTF_8));
+        clientOutput.write(("Content-Type: " + contentType + "\r\n").getBytes(StandardCharsets.UTF_8));
+        clientOutput.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        //TODO a
+        clientOutput.write(content);
+        clientOutput.write("\r\n\r\n".getBytes());
+        clientOutput.flush();
+        if (!request.getTypeConnection().equals("keep-alive")) {
+            client.close();
         }
     }
 }
