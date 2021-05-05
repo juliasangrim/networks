@@ -5,20 +5,12 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-//TODO
-//Необходимые возможности:
-//- Поддержка только GET запроса: возвращение файла, лежащего по данному адресу на машине, где запущен сервер
-//- - Пример: если сервер запущен в папке C:/server и был сделан запрос GET /dir/file.jpg, в теле ответа надо вернуть файл, лежащий по адресу C:/server/dir/file.jpg
-//- - поддерживаемые MIME типы: text/plain, text/html, image/jpeg (см. заголовок Accept)
-//- Обработка заголовков:
-//- - Заголовки запроса:
-//- - - Accept (https://developer.mozilla.org/ru/docs/Web/HTTP/Headers/Accept), Connection (как персистентные, так и нет) (внимание: персистентное соединение не обязано выдерживать перегрузки кучей подключений, но должно работать если подключается 1 клиент и периодически чото просит)
-//- - Заголовки ответа:
-//- - - content-type, date, last-modified, content-length, server (просто придумайте своё название сервера и пишите туда)
-//- Необрабатываемые заголовки можно просто игнорировать
-//- Обработка ошибок: 405 Method Not Allowed на неподдерживаемый метод, 404 Not Found если файла нет
+import java.nio.file.attribute.FileTime;
+import java.util.Date;
+
 
 public class HttpServer {
     //define const
@@ -34,20 +26,22 @@ public class HttpServer {
                         System.out.println("Empty package");
                         continue;
                     }
-                    if (request.getMethod().equals("GET")) {
-                        String path = request.getPath();
-                        Path filePath = getFilePath(path);
-                        if (Files.exists(filePath)) {
-                            // file exist
-                            String contentType = getType(filePath);
-                            //sendResponse(client, "200 OK", contentType, Files.readAllBytes(filePath), request);
+                    String path = request.getPath();
+                    Path filePath = getFilePath(path);
+                    String contentType = getType(filePath);
+                    if (Files.exists(filePath)) {
+                        // file exist
+                        FileTime lastModified = Files.getLastModifiedTime(filePath, LinkOption.NOFOLLOW_LINKS);
+                        if (request.getMethod().equals("GET") && (request.getAccept().contains(contentType) || request.getAccept().contains("*/*"))) {
+                            sendResponse(client, "200 OK", contentType, Files.readAllBytes(filePath), request, lastModified);
                         } else {
-                            byte[] error = "<h1>404 Not found </h1>".getBytes(StandardCharsets.UTF_8);
-                           // sendResponse(client, "404 Not found", "text/html", error, request);
+                            byte[] error = "<h1>405 Method Not Allowed<h1>".getBytes(StandardCharsets.UTF_8);
+                            sendResponse(client, "405 Method Not Allowed", "text/html", error, request, null);
                         }
                     } else {
-                        byte[] error = "<h1>405 Method Not Allowed </h1>".getBytes(StandardCharsets.UTF_8);
-                       // sendResponse();
+                        if (request.getAccept().contains("image/x-icon")) continue;
+                        byte[] error = "<h1>404 Not Found </h1>".getBytes(StandardCharsets.UTF_8);
+                        sendResponse(client, "404 Not Found", "text/html", error, request, null);
                     }
                 }
             }
@@ -62,6 +56,7 @@ public class HttpServer {
         while ((line = input.readLine()) != null) {
             if (line.isEmpty()) break;
             requestBuilder.append(line).append("\r\n");
+            System.out.println(line);
         }
         if (requestBuilder.length() == 0) {
             client.close();
@@ -90,12 +85,16 @@ public class HttpServer {
         return Paths.get("src", path);
     }
 //send response to client
-    public static void sendResponse(Socket client, String status, String contentType, byte[] content, Request request) throws IOException {
+    public static void sendResponse(Socket client, String status, String contentType, byte[] content, Request request, FileTime lastModified ) throws IOException {
         OutputStream clientOutput = client.getOutputStream();
         clientOutput.write(("HTTP/1.1 \r\n" + status).getBytes(StandardCharsets.UTF_8));
+        clientOutput.write(("Server: server" + "\r\n").getBytes(StandardCharsets.UTF_8));
+        Date date = new Date();
+        clientOutput.write(("Data:" + date.toString() +"\r\n").getBytes(StandardCharsets.UTF_8));
+        clientOutput.write(("Connection: " + request.getTypeConnection() + "\r\n").getBytes(StandardCharsets.UTF_8));
         clientOutput.write(("Content-Type: " + contentType + "\r\n").getBytes(StandardCharsets.UTF_8));
+        clientOutput.write(("Content-Length:" + content.length + "\r\n").getBytes(StandardCharsets.UTF_8));
         clientOutput.write("\r\n".getBytes(StandardCharsets.UTF_8));
-        //TODO a
         clientOutput.write(content);
         clientOutput.write("\r\n\r\n".getBytes());
         clientOutput.flush();

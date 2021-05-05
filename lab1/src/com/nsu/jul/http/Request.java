@@ -19,7 +19,7 @@ public class Request {
         version = firstLine[2];
         host = requestLines[1].split(" ")[1];
         connection = requestLines[2].split(" ")[1];
-        accept = requestLines[6].split(" ")[1];
+        accept = requestLines[5].split(" ")[1];
     }
 
     public String getPath() {

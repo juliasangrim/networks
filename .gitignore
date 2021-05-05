@@ -7,3 +7,5 @@ lab1/.idea/misc.xml
 lab1/gradlew
 *.xml
 *.bat
+lab1/out/production/lab1/com/nsu/jul/http/HttpServer.class
+*.class
