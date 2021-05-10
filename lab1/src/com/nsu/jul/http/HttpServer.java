@@ -16,36 +16,48 @@ public class HttpServer {
     //define const
     static final int PORT = 8000;
     //run server
-    public static void runServer() throws IOException {
-        try(ServerSocket serverSocket = new ServerSocket(PORT)) {
+    public static void runServer() {
+        try {
+            System.out.println("Server started!");
+            ServerSocket serverSocket = new ServerSocket(PORT);
             while(true) {
-                System.out.println("Server started!");
-                try (Socket client  = serverSocket.accept()) {
-                    Request request = handleRequest(client);
-                    if (request == null) {
-                        System.out.println("Empty package");
-                        continue;
-                    }
-                    String path = request.getPath();
-                    Path filePath = getFilePath(path);
-                    String contentType = getType(filePath);
-                    if (Files.exists(filePath)) {
-                        // file exist
-                        FileTime lastModified = Files.getLastModifiedTime(filePath, LinkOption.NOFOLLOW_LINKS);
-                        if (request.getMethod().equals("GET") && (request.getAccept().contains(contentType) || request.getAccept().contains("*/*"))) {
-                            sendResponse(client, "200 OK", contentType, Files.readAllBytes(filePath), request, lastModified);
-                        } else {
-                            byte[] error = "<h1>405 Method Not Allowed<h1>".getBytes(StandardCharsets.UTF_8);
-                            sendResponse(client, "405 Method Not Allowed", "text/html", error, request, null);
+                System.out.println("Client!");
+                Socket client  = serverSocket.accept();
+                while(!client.isClosed()) {
+                    try {
+                        //client.setSoTimeout(100);
+                        Request request = handleRequest(client);
+                        if (request == null) {
+                            System.out.println("Lost connection.");
+                            break;
                         }
-                    } else {
-                        if (request.getAccept().contains("image/x-icon")) continue;
-                        byte[] error = "<h1>404 Not Found </h1>".getBytes(StandardCharsets.UTF_8);
-                        sendResponse(client, "404 Not Found", "text/html", error, request, null);
+                        String path = request.getPath();
+                        Path filePath = getFilePath(path);
+                        String contentType = getType(filePath);
+                        if (Files.exists(filePath)) {
+                            // file exist
+                            FileTime lastModified = Files.getLastModifiedTime(filePath, LinkOption.NOFOLLOW_LINKS);
+                            if (request.getMethod().equals("GET") && (request.getAccept().contains(contentType) || request.getAccept().contains("*/*"))) {
+                                sendResponse(client, "200 OK", contentType, Files.readAllBytes(filePath), request, lastModified);
+                            } else {
+                                byte[] error = "<h1>405 Method Not Allowed<h1>".getBytes(StandardCharsets.UTF_8);
+                                sendResponse(client, "405 Method Not Allowed", "text/html", error, request, null);
+                            }
+                        } else {
+                            if (request.getAccept().contains("image/x-icon")) continue;
+                            byte[] error = "<h1>404 Not Found </h1>".getBytes(StandardCharsets.UTF_8);
+                            sendResponse(client, "404 Not Found", "text/html", error, request, null);
+                        }
+                    } catch (IOException e) {
+                        System.err.println("Server error while working" + e.getMessage());
+                        client.close();
                     }
                 }
             }
+        } catch (IOException e) {
+            System.err.println("Server connection error: " + e.getMessage());
         }
+
     }
     //handle request from client
     public static Request handleRequest(Socket client) throws IOException {
@@ -58,17 +70,14 @@ public class HttpServer {
             requestBuilder.append(line).append("\r\n");
             System.out.println(line);
         }
-        if (requestBuilder.length() == 0) {
-            client.close();
-        } else {
+        if (requestBuilder.length() > 0) {
             request = new Request(requestBuilder);
-            request.print();
         }
         return request;
     }
 
 //get type for content
-    public static String getType(Path filePath) throws IOException {
+    public static String getType(Path filePath) throws IOException{
         return Files.probeContentType(filePath);
     }
 //get path of content file
@@ -85,21 +94,30 @@ public class HttpServer {
         return Paths.get("src", path);
     }
 //send response to client
-    public static void sendResponse(Socket client, String status, String contentType, byte[] content, Request request, FileTime lastModified ) throws IOException {
-        OutputStream clientOutput = client.getOutputStream();
-        clientOutput.write(("HTTP/1.1 \r\n" + status).getBytes(StandardCharsets.UTF_8));
-        clientOutput.write(("Server: server" + "\r\n").getBytes(StandardCharsets.UTF_8));
-        Date date = new Date();
-        clientOutput.write(("Data:" + date.toString() +"\r\n").getBytes(StandardCharsets.UTF_8));
-        clientOutput.write(("Connection: " + request.getTypeConnection() + "\r\n").getBytes(StandardCharsets.UTF_8));
-        clientOutput.write(("Content-Type: " + contentType + "\r\n").getBytes(StandardCharsets.UTF_8));
-        clientOutput.write(("Content-Length:" + content.length + "\r\n").getBytes(StandardCharsets.UTF_8));
-        clientOutput.write("\r\n".getBytes(StandardCharsets.UTF_8));
-        clientOutput.write(content);
-        clientOutput.write("\r\n\r\n".getBytes());
-        clientOutput.flush();
-        if (!request.getTypeConnection().equals("keep-alive")) {
-            client.close();
+    public static void sendResponse(Socket client, String status, String contentType, byte[] content, Request request, FileTime lastModified ) {
+        try {
+            OutputStream clientOutput = client.getOutputStream();
+            clientOutput.write(("HTTP/1.1 \r\n" + status).getBytes(StandardCharsets.UTF_8));
+            clientOutput.write(("Server: server" + "\r\n").getBytes(StandardCharsets.UTF_8));
+            Date date = new Date();
+            clientOutput.write(("Data:" + date.toString() + "\r\n").getBytes(StandardCharsets.UTF_8));
+            if (lastModified != null) {
+             clientOutput.write(("Last Modified: " + lastModified.toString() + "\r\n").getBytes(StandardCharsets.UTF_8));
+            }
+            clientOutput.write(("Connection: " + request.getTypeConnection() + "\r\n").getBytes(StandardCharsets.UTF_8));
+            clientOutput.write(("Content-Type: " + contentType + "\r\n").getBytes(StandardCharsets.UTF_8));
+            clientOutput.write(("Content-Length:" + content.length + "\r\n").getBytes(StandardCharsets.UTF_8));
+            clientOutput.write("\r\n".getBytes(StandardCharsets.UTF_8));
+            clientOutput.write(content);
+            clientOutput.write("\r\n\r\n".getBytes());
+            clientOutput.flush();
+            if (!request.getTypeConnection().equals("keep-alive")) {
+                System.out.println("Lost connection.");
+                client.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Lost connection while writing response " + e.getMessage());
         }
     }
 }
+

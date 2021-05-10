@@ -12,14 +12,22 @@ public class Request {
     public Request(StringBuilder requestBuilder) {
         String fullRequest = requestBuilder.toString();
         String[] requestLines = fullRequest.split("\r\n");
-        String[] firstLine = requestLines[0].split(" ");
-
-        method = firstLine[0];
-        path = firstLine[1];
-        version = firstLine[2];
-        host = requestLines[1].split(" ")[1];
-        connection = requestLines[2].split(" ")[1];
-        accept = requestLines[5].split(" ")[1];
+        for (String string : requestLines) {
+            if (string.contains("GET")) {
+                method = string.split(" ")[0];
+                path = string.split(" ")[1];
+                version = string.split(" ")[2];
+            }
+            if (string.contains("Host:")) {
+                host = string.split(" ")[1];
+            }
+            if (string.contains("Connection:")) {
+               connection = string.split(" ")[1];
+            }
+           if (string.contains("Accept:")) {
+                accept = string.split(" ")[1];
+           }
+        }
     }
 
     public String getPath() {
