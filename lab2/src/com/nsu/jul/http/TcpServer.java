@@ -31,7 +31,7 @@ public class TcpServer extends TcpSocket{
             } else {
                 //sent synack packet
                 lastAck = syn.seqNum + 1;
-                Packet synAck = new Packet(syn.seqNum, lastAck, 1, true, true);
+                Packet synAck = new Packet(syn.seqNum, lastAck, 1, true, true, null);
                 sendPacket(datagramSocket, senderPort, synAck);
 
             }
@@ -50,14 +50,14 @@ public class TcpServer extends TcpSocket{
                 //send ack packet
                 if (lastAck <= receivePacket.seqNum) {
                     int newAck = receivePacket.seqNum + 1;
-                    Packet ack = new Packet(seqNum, newAck, 1, true,false);
+                    Packet ack = new Packet(seqNum, newAck, 1, true,false, null);
                     seqNum++;
                     sendPacket(datagramSocket, senderPort, ack);
                     lastAck = newAck;
                     return receivePacket;
                 } else {
                     //if last ack < then packet ack so we should request data again
-                    Packet duplicateAck = new Packet(seqNum, lastAck + 1, 1, true, false);
+                    Packet duplicateAck = new Packet(seqNum, lastAck + 1, 1, true, false, null);
                     sendPacket(datagramSocket, senderPort);
                     System.out.println("Send duplicate ACK");
                 }

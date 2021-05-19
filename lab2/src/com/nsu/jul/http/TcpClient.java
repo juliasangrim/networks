@@ -28,7 +28,7 @@ public class TcpClient extends TcpSocket{
     private boolean handShakeTcpClient() {
         try {
             //make syn packet
-            Packet syn = new Packet(seqNum, 0, 1, false, true);
+            Packet syn = new Packet(seqNum, 0, 1, false, true, null);
             seqNum++;
             sendPacket(datagramSocket, receiverPort, syn);
             //receive synack packet
@@ -44,7 +44,7 @@ public class TcpClient extends TcpSocket{
 
             } else {
                 //sen ack packet
-                Packet ack = new Packet(seqNum, synAck.seqNum + 1, 1, true, false);
+                Packet ack = new Packet(seqNum, synAck.seqNum + 1, 1, true, false, null);
                 seqNum++;
                 sendPacket(datagramSocket, receiverPort, ack);
                 lastAck = seqNum;
