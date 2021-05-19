@@ -1,4 +1,4 @@
-package com.nsu.jul.http;
+package com.nsu.jul.tcp;
 
 import java.net.SocketException;
 
