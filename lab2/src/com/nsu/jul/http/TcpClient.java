@@ -27,11 +27,11 @@ public class TcpClient extends TcpSocket{
 
     private boolean handShakeTcpClient() {
         try {
-            //make syn packet seqnum = clientSeqNum it's not ack and it's syn
+            //make syn packet
             Packet syn = new Packet(seqNum, 0, 1, false, true);
             seqNum++;
             sendPacket(datagramSocket, receiverPort, syn);
-            //receive synack packet with seqnum = clienSeqNum + 1 and ack = clientSeqNum + 1
+            //receive synack packet
 
             Packet synAck = recvPacket(datagramSocket);
             if (synAck == null) {
@@ -43,7 +43,7 @@ public class TcpClient extends TcpSocket{
                 throw new ConnectException();
 
             } else {
-                //sen ack packet with seqNum = clientSeqNum + 2 and ack  = clientSeqNum + 2
+                //sen ack packet
                 Packet ack = new Packet(seqNum, synAck.seqNum + 1, 1, true, false);
                 seqNum++;
                 sendPacket(datagramSocket, receiverPort, ack);
@@ -66,16 +66,15 @@ public class TcpClient extends TcpSocket{
             //waiting for packet
             Packet receivePacket = recvPacket(datagramSocket);
             if (receivePacket != null) {
-                if (!receivePacket.isSyn && receivePacket.isAck) {
                     int newAck = receivePacket.ack;
+                    //if packet ack > then we should upd ack
                     if (newAck > lastAck) {
                         lastAck = newAck;
                         return receivePacket;
                     }
-                }
             } else {
                 long currTime = System.currentTimeMillis();
-                if (currTime >= timeout) {
+                if (currTime - startTime >= timeout) {
                     sendPacket(datagramSocket, receiverPort, currPacket);
                 }
             }
@@ -84,6 +83,7 @@ public class TcpClient extends TcpSocket{
 
 
     private void send(Packet sendingPacket) throws IOException {
+        //for duplicate packet if timeout end
         this.currPacket = sendingPacket;
         sendPacket(datagramSocket, receiverPort, currPacket);
     }
@@ -93,7 +93,7 @@ public class TcpClient extends TcpSocket{
             String hihi = "hihi";
             Packet packetHihi = new Packet(seqNum, 0, hihi.length(), false, false, hihi);
             try {
-                sendPacket(datagramSocket, receiverPort, packetHihi);
+                send(packetHihi);
                 System.out.println("Client sent: " + packetHihi);
                 Packet ack = receiveAck();
                 System.out.println("Client received: " + ack);

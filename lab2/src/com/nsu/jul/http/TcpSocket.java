@@ -44,6 +44,7 @@ public class TcpSocket {
 
     protected Packet recvPacket(DatagramSocket datagramSocket) throws IOException, ClassNotFoundException {
         byte[] recvData = new byte[SIZE_DATA];
+        //get new packet
         DatagramPacket recvPacket = new DatagramPacket(recvData, recvData.length);
         try {
             datagramSocket.receive(recvPacket);
@@ -52,6 +53,7 @@ public class TcpSocket {
         } catch (IOException e) {
             e.printStackTrace();
         }
+        //deserialize packet
         ByteArrayInputStream arrayInputStream = new ByteArrayInputStream(recvData);
         ObjectInputStream inputStream = new ObjectInputStream(new BufferedInputStream(arrayInputStream));
         Packet packet = (Packet)inputStream.readObject();
