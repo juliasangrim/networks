@@ -1,4 +1,4 @@
 # University course
 ## networks 
- lab1 - http server
- lab2 - simple tcp over udp
+ 1. lab1 - http server
+ 2. lab2 - simple tcp over udp
